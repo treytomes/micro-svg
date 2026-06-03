@@ -356,6 +356,7 @@ parseSvgColor = function(rawText)
 			text = text[:-1]
 			v = val(text)
 			qa.assert 0 <= v and v <= 100, "Value is out of range; expected a percentage."
+			v = floor(v / 100 * 255)
 		else
 			v = val(text)
 			qa.assert 0 <= v and v <= 255, "Value is out of range; expected a value for 0 to 255."
@@ -395,6 +396,8 @@ runUnitTests = function()
 	qa.assert parseSvgColor("rgba(1, 2, 3, 4)") == "#01020304"
 	qa.assert parseSvgColor("rgb(3, 10, 100)") == "#030A64FF"
 	qa.assert parseSvgColor("aliceblue") == knownColors["aliceblue"]
+	qa.assert parseSvgColor("rgb(25%, 50%, 75%)") == color.fromList([25/100*255, 50/100*255, 75/100*255])
+	qa.assert parseSvgColor("rgba(25%, 50%, 75%, 100%)") == color.fromList([25/100*255, 50/100*255, 75/100*255, 100/100*255])
 end function
 
 if globals == locals then
