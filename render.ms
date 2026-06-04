@@ -1,8 +1,9 @@
+import "mathUtil"
 import "qa"
-import "xml"
 
-import "svgColor"
 import "customGfx"
+import "svgColor"
+import "xml"
 
 removeEmptyEntries = function(arr)
 	newArr = []
@@ -14,6 +15,159 @@ removeEmptyEntries = function(arr)
 	return newArr
 end function
 
+splitEntries = function(text, splitArr)
+	entries = text.split(splitArr[0])
+	splitArr = splitArr[1:]
+
+	while len(splitArr) > 0
+		newEntries = []
+		for item in entries
+			newEntries += item.split(splitArr[0])
+		end for
+		splitArr = splitArr[1:]
+		entries = newEntries
+	end while
+
+	return removeEmptyEntries(entries)
+end function
+
+parseStrokeDashArray = function(strokeDashArray)
+	if strokeDashArray == null or strokeDashArray == "none" then return null
+
+	strokeDashArray = splitEntries(strokeDashArray, [" ", ","])
+	
+	n = 0
+	while n < len(strokeDashArray)
+		strokeDashArray[n] = val(strokeDashArray[n])
+		n += 1
+	end while
+	return strokeDashArray
+end function
+
+parseValue = function(valueText)
+	if valueText == null or valueText == "none" or len(valueText) == 0 then return 0
+
+	// A percentage will be parsed simply as a value between 0 and 1.
+	// This may come back to bite me later.
+	if valueText.endsWith("%") then return val(valueText[:-1]) / 100
+
+	return val(valueText)
+end function
+
+parseColor = function(colorText)
+	if colorText == null or colorText == "none" or len(colorText) == 0 then return color.black
+	return svgColor.parseSvgColor(colorText)
+end function
+
+SvgRect = {}
+
+SvgRect.make = function(rectElem)
+    self = new self
+
+    // Parse attributes.
+    self.x = parseValue(rectElem.attributes.get("x"))
+    self.y = parseValue(rectElem.attributes.get("y"))
+    self.width = parseValue(rectElem.attributes.get("width"))
+    self.height = parseValue(rectElem.attributes.get("height"))
+    self.fillColor = parseColor(rectElem.attributes.get("fill"))
+    self.strokeWidth = parseValue(rectElem.attributes.get("stroke-width"))
+    self.strokeColor = parseColor(rectElem.attributes.get("stroke"))
+
+    return self
+end function
+
+SvgRect.render = function(svgRoot)
+    pd = svgRoot.display
+
+	// If width or height are percentages, expand them out.
+	width = self.width
+	height = self.height
+	if 0 < width and width <= 1 then width *= svgRoot.display.width
+	if 0 < height and height <= 1 then height *= svgRoot.display.height
+
+    // Draw the filled rectangle.
+    if self.fillColor != color.clear then
+        pd.fillRect(self.x, self.y, width, height, self.fillColor)
+    end if
+
+    // Draw the stroke (outline).
+    if self.strokeWidth > 0 and self.strokeColor != color.clear then
+        pd.drawRect(self.x, self.y, width, height, self.strokeColor, self.strokeWidth)
+    end if
+end function
+
+SvgLine = {}
+
+SvgLine.make = function(lineElem)
+	self = new self
+
+	self.x1 = val(lineElem.attributes.x1)
+	self.y1 = val(lineElem.attributes.y1)
+	self.x2 = val(lineElem.attributes.x2)
+	self.y2 = val(lineElem.attributes.y2)
+	
+	self.pathLength = parseValue(lineElem.attributes.get("pathLength"))
+	self.strokeDashArray = parseStrokeDashArray(lineElem.attributes.get("stroke-dasharray"))
+	self.strokeWidth = parseValue(lineElem.attributes.get("stroke-width"))
+	self.strokeColor = parseColor(lineElem.attributes.get("stroke"))
+	return self
+end function
+
+SvgLine.render = function(svgRoot)
+    pd = svgRoot.display
+    dx = self.x2 - self.x1
+    dy = self.y2 - self.y1
+    actualLength = sqrt(dx * dx + dy * dy)
+
+    // Default pathLength to the line's actual length.
+    if self.pathLength == 0 then self.pathLength = actualLength
+
+    // If no dash pattern, draw the full line.
+    if self.strokeDashArray == null or len(self.strokeDashArray) == 0 then
+        pd.line(self.x1, self.y1, self.x2, self.y2, self.strokeColor, self.strokeWidth)
+        return
+    end if
+
+    // Calculate the scaling factor.
+    scalingFactor = actualLength / self.pathLength
+    // Scale the dash pattern.
+    scaledDashArray = []
+    for dash in self.strokeDashArray
+        scaledDashArray.push(dash * scalingFactor)
+    end for
+
+    // Calculate the direction vector (normalized).
+    if actualLength > 0 then
+        dirX = dx / actualLength
+        dirY = dy / actualLength
+    else
+        dirX = 0
+        dirY = 0
+        return  // No line to draw.
+    end if
+
+    // Draw dashes along the line.
+    distance = 0
+    dashIndex = 0
+    while distance < actualLength
+        dashLength = scaledDashArray[dashIndex % len(scaledDashArray)]
+        // Clamp to the remaining line length, with a minimum of 1 pixel.
+        dashLength = mathUtil.max(mathUtil.min(dashLength, actualLength - distance), 1)
+
+        if dashIndex % 2 == 0 then  // Even indices = dashes (visible).
+            // Calculate dash start and end points (rounded to nearest pixel).
+            dashStartX = floor(self.x1 + dirX * distance + 0.5)
+            dashStartY = floor(self.y1 + dirY * distance + 0.5)
+            dashEndX = floor(self.x1 + dirX * (distance + dashLength) + 0.5)
+            dashEndY = floor(self.y1 + dirY * (distance + dashLength) + 0.5)
+            pd.line(dashStartX, dashStartY, dashEndX, dashEndY, self.strokeColor, self.strokeWidth)
+        end if
+
+        distance += dashLength
+        dashIndex += 1
+    end while
+end function
+
 SvgCircle = {}
 
 SvgCircle.make = function(circleElem)
@@ -22,45 +176,11 @@ SvgCircle.make = function(circleElem)
 	self.cy = val(circleElem.attributes.cy)
 	self.r = val(circleElem.attributes.r)
 
-	self.pathLength = circleElem.attributes.get("pathLength")
-	if self.pathLength == null or self.pathLength == "none" then
-		self.pathLength = null
-	else
-		self.pathLength = val(self.pathLength)
-	end if
-
-	self.strokeDashArray = circleElem.attributes.get("stroke-dasharray")
-	if self.strokeDashArray == null or self.strokeDashArray == "none" then
-		self.strokeDashArray = null
-	else
-		self.strokeDashArray = removeEmptyEntries(self.strokeDashArray.split(" "))
-		n = 0
-		while n < len(self.strokeDashArray)
-			self.strokeDashArray[n] = val(self.strokeDashArray[n])
-			n += 1
-		end while
-	end if
-
-	self.strokeWidth = circleElem.attributes.get("stroke-width")
-	if self.strokeWidth == null or self.strokeWidth == "none" then
-		self.strokeWidth = 0
-	else
-		self.strokeWidth = val(self.strokeWidth)
-	end if
-
-	self.fillColor = circleElem.attributes.get("fill")
-	if self.fillColor == null or self.fillColor == "none" then
-		self.fillColor = color.black
-	else
-		self.fillColor = svgColor.parseSvgColor(self.fillColor)
-	end if
-	
-	self.strokeColor = circleElem.attributes.get("stroke")
-	if self.strokeColor == null or self.strokeColor == "none" then
-		self.strokeColor = color.black
-	else
-		self.strokeColor = svgColor.parseSvgColor(self.strokeColor)
-	end if
+	self.fillColor = parseColor(circleElem.attributes.get("fill"))
+	self.pathLength = parseValue(circleElem.attributes.get("pathLength"))
+	self.strokeDashArray = parseStrokeDashArray(circleElem.attributes.get("stroke-dasharray"))
+	self.strokeWidth = parseValue(circleElem.attributes.get("stroke-width"))
+	self.strokeColor = parseColor(circleElem.attributes.get("stroke"))
 	return self
 end function
 
@@ -124,6 +244,10 @@ Svg.make = function(svgElem)
 	for item in contents
 		if item.name == "circle" then
 			self.children.push SvgCircle.make(item)
+		else if item.name == "line" then
+			self.children.push SvgLine.make(item)
+		else if item.name == "rect" then
+            self.children.push SvgRect.make(item)
 		else
 			qa.assert false, "Unknown element type: {0}".fill([ ])
 		end if
@@ -153,7 +277,8 @@ Svg.render = function(pd, x = 0, y = 0, width = -1, height = -1)
 end function
 
 // fileText = file.readLines("demo/circle.svg").join("")
-fileText = file.readLines("demo/doubleCircle.svg").join("")
+// fileText = file.readLines("demo/doubleCircle.svg").join("")
+fileText = file.readLines("demo/starryConstellation.svg").join("")
 svgElem = xml.parseXml(fileText)
 // pprint svgElem
 
