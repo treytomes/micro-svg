@@ -216,7 +216,7 @@ XmlParser.parseClosingTag = function(tagName)
 	// print "END parseClosingTag"
 end function
 
-XmlParser.parseElement = function
+XmlParser.skipComment = function
 	self.skipWhiteSpace()
 	if self.peek == "<" and self.peek(1) == "!" and self.peek(2) == "-" and self.peek(3) == "-" then
 		self.read
@@ -235,7 +235,18 @@ XmlParser.parseElement = function
 			self.read
 		end while
 		// print "Skipped comment. " + self.text[self.index:]
+		return true
 	end if
+	return false
+end function
+
+XmlParser.skipComments = function
+	while self.skipComment
+	end while
+end function
+
+XmlParser.parseElement = function
+	self.skipComments
 
 	// print "BEGIN parseElement"
 	elem = self.parseOpeningTag
