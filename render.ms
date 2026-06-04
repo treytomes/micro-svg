@@ -1,6 +1,8 @@
-import "parseSvgColor"
 import "qa"
 import "xml"
+
+import "svgColor"
+import "customGfx"
 
 removeEmptyEntries = function(arr)
 	newArr = []
@@ -19,9 +21,46 @@ SvgCircle.make = function(circleElem)
 	self.cx = val(circleElem.attributes.cx)
 	self.cy = val(circleElem.attributes.cy)
 	self.r = val(circleElem.attributes.r)
-	self.penSize = 0
-	self.strokeColor = color.black
-	self.fillColor = color.black
+
+	self.pathLength = circleElem.attributes.get("pathLength")
+	if self.pathLength == null or self.pathLength == "none" then
+		self.pathLength = null
+	else
+		self.pathLength = val(self.pathLength)
+	end if
+
+	self.strokeDashArray = circleElem.attributes.get("stroke-dasharray")
+	if self.strokeDashArray == null or self.strokeDashArray == "none" then
+		self.strokeDashArray = null
+	else
+		self.strokeDashArray = removeEmptyEntries(self.strokeDashArray.split(" "))
+		n = 0
+		while n < len(self.strokeDashArray)
+			self.strokeDashArray[n] = val(self.strokeDashArray[n])
+			n += 1
+		end while
+	end if
+
+	self.strokeWidth = circleElem.attributes.get("stroke-width")
+	if self.strokeWidth == null or self.strokeWidth == "none" then
+		self.strokeWidth = 0
+	else
+		self.strokeWidth = val(self.strokeWidth)
+	end if
+
+	self.fillColor = circleElem.attributes.get("fill")
+	if self.fillColor == null or self.fillColor == "none" then
+		self.fillColor = color.black
+	else
+		self.fillColor = svgColor.parseSvgColor(self.fillColor)
+	end if
+	
+	self.strokeColor = circleElem.attributes.get("stroke")
+	if self.strokeColor == null or self.strokeColor == "none" then
+		self.strokeColor = color.black
+	else
+		self.strokeColor = svgColor.parseSvgColor(self.strokeColor)
+	end if
 	return self
 end function
 
@@ -34,8 +73,8 @@ SvgCircle.render = function(svgRoot)
 	width = self.r * 2
 	height = self.r * 2
 
-	svgRoot.display.fillEllipse left - offsetX, bottom - offsetY, width, height, self.fillColor
-	svgRoot.display.drawEllipse left - offsetX, bottom - offsetY, width, height, self.strokeColor, self.penSize
+	customGfx.renderFilledCircle svgRoot.display, self.cx, self.cy, self.r, self.fillColor
+	customGfx.renderCircle svgRoot.display, self.cx, self.cy, self.r, self.strokeColor, self.strokeWidth, self.strokeDashArray, self.pathLength
 end function
 
 GfxViewBox = {}
@@ -100,7 +139,7 @@ Svg.getImage = function
 	return self.display.getImage(0, 0, self.viewBox.width, self.viewBox.height)
 end function
 
-Svg.render = function(targetDisplay, x = 0, y = 0, width = -1, height = -1)
+Svg.render = function(pd, x = 0, y = 0, width = -1, height = -1)
 	self.display.clear self.backgroundColor, self.viewBox.width, self.viewBox.height
 
 	for item in self.children
@@ -108,16 +147,17 @@ Svg.render = function(targetDisplay, x = 0, y = 0, width = -1, height = -1)
 	end for
 
 	img = root.getImage
-	if width == -1 then width = targetDisplay.width
-	if height == -1 then height = targetDisplay.height
-	targetDisplay.drawImage img, x, y, width, height, 0, 0, img.width, img.height, self.tint
+	if width == -1 then width = pd.width
+	if height == -1 then height = pd.height
+	pd.drawImage img, x, y, width, height, 0, 0, img.width, img.height, self.tint
 end function
 
-fileText = file.readLines("demo/circle.svg").join("")
+// fileText = file.readLines("demo/circle.svg").join("")
+fileText = file.readLines("demo/doubleCircle.svg").join("")
 svgElem = xml.parseXml(fileText)
-pprint svgElem
+// pprint svgElem
 
 root = Svg.make(svgElem)
 
 gfx.clear
-root.render gfx, 100, 100, 256, 256
+root.render gfx, 50, 50, 512, 512
