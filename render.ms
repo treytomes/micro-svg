@@ -108,7 +108,6 @@ Svg.render = function(targetDisplay, x = 0, y = 0, width = -1, height = -1)
 	end for
 
 	img = root.getImage
-	pprint targetDisplay
 	if width == -1 then width = targetDisplay.width
 	if height == -1 then height = targetDisplay.height
 	targetDisplay.drawImage img, x, y, width, height, 0, 0, img.width, img.height, self.tint
@@ -116,9 +115,9 @@ end function
 
 fileText = file.readLines("demo/circle.svg").join("")
 svgElem = xml.parseXml(fileText)
-// pprint svgElem
+pprint svgElem
 
 root = Svg.make(svgElem)
 
 gfx.clear
-root.render gfx, 100, 100, 128, 128
+root.render gfx, 100, 100, 256, 256
