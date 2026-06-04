@@ -390,7 +390,7 @@ parseSvgColor = function(rawText)
 	end if
 end function
 
-runUnitTests = function()
+runUnitTests = function
 	qa.assert parseSvgColor("#123456") == "#123456"
 	qa.assert parseSvgColor("rgb(1, 2, 3)") == "#010203FF"
 	qa.assert parseSvgColor("rgba(1, 2, 3, 4)") == "#01020304"
