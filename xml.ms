@@ -66,7 +66,7 @@ end function
 
 XmlParser.readAlphaNumeric = function(ch)
 	ch = self.peek
-	if self.isAlphaNumeric(ch) then
+	if self.isAlphaNumeric(ch) or ch == "-" then
 		self.read
 		return ch
 	end if
@@ -217,6 +217,26 @@ XmlParser.parseClosingTag = function(tagName)
 end function
 
 XmlParser.parseElement = function
+	self.skipWhiteSpace()
+	if self.peek == "<" and self.peek(1) == "!" and self.peek(2) == "-" and self.peek(3) == "-" then
+		self.read
+		self.read
+		self.read
+		self.read
+
+		// Read to the end of the comment block.
+		while true
+			if self.peek == "-" and self.peek(1) == "-" and self.peek(2) == ">" then
+				self.read
+				self.read
+				self.read
+				break
+			end if
+			self.read
+		end while
+		// print "Skipped comment. " + self.text[self.index:]
+	end if
+
 	// print "BEGIN parseElement"
 	elem = self.parseOpeningTag
 	if elem == null then return null
