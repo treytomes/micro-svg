@@ -31,17 +31,24 @@ splitEntries = function(text, splitArr)
 	return removeEmptyEntries(entries)
 end function
 
-parseStrokeDashArray = function(strokeDashArray)
-	if strokeDashArray == null or strokeDashArray == "none" then return null
+Axis = {
+	"horizontal": 0,
+	"vertical": 1,
+	"diagonal": 2,
+}
 
-	strokeDashArray = splitEntries(strokeDashArray, [" ", ","])
-	
-	n = 0
-	while n < len(strokeDashArray)
-		strokeDashArray[n] = val(strokeDashArray[n])
-		n += 1
-	end while
-	return strokeDashArray
+PercentValue = {}
+
+PercentValue.make = function(value)
+	self = new self
+	self.value = value
+	return self
+end function
+
+PercentValue.resolve = function(svgRoot, axis)
+	if axis == Axis.horizontal then return self.value * svgRoot.viewBox.width
+	if axis == Axis.vertical then return self.value * svgRoot.viewBox.height
+	return self.value * svgRoot.viewBox.normalizedDiagonal
 end function
 
 parseValue = function(valueText)
@@ -49,9 +56,22 @@ parseValue = function(valueText)
 
 	// A percentage will be parsed simply as a value between 0 and 1.
 	// This may come back to bite me later.
-	if valueText.endsWith("%") then return val(valueText[:-1]) / 100
+	if valueText.endsWith("%") then return PercentValue.make(val(valueText[:-1]) / 100)
 
 	return val(valueText)
+end function
+
+parseStrokeDashArray = function(strokeDashArray)
+	if strokeDashArray == null or strokeDashArray == "none" then return null
+
+	strokeDashArray = splitEntries(strokeDashArray, [" ", ","])
+	
+	n = 0
+	while n < len(strokeDashArray)
+		strokeDashArray[n] = parseValue(strokeDashArray[n])
+		n += 1
+	end while
+	return strokeDashArray
 end function
 
 parseColor = function(colorText)
@@ -81,9 +101,10 @@ SvgRect.render = function(svgRoot)
 
 	// If width or height are percentages, expand them out.
 	width = self.width
+	if width isa PercentValue then width = width.resolve(svgRoot, Axis.horizontal)
+
 	height = self.height
-	if 0 < width and width <= 1 then width *= svgRoot.display.width
-	if 0 < height and height <= 1 then height *= svgRoot.display.height
+	if height isa PercentValue then height = height.resolve(svgRoot, Axis.vertical)
 
     // Draw the filled rectangle.
     if self.fillColor != color.clear then
@@ -101,10 +122,10 @@ SvgLine = {}
 SvgLine.make = function(lineElem)
 	self = new self
 
-	self.x1 = val(lineElem.attributes.x1)
-	self.y1 = val(lineElem.attributes.y1)
-	self.x2 = val(lineElem.attributes.x2)
-	self.y2 = val(lineElem.attributes.y2)
+	self.x1 = parseValue(lineElem.attributes.x1)
+	self.y1 = parseValue(lineElem.attributes.y1)
+	self.x2 = parseValue(lineElem.attributes.x2)
+	self.y2 = parseValue(lineElem.attributes.y2)
 	
 	self.pathLength = parseValue(lineElem.attributes.get("pathLength"))
 	self.strokeDashArray = parseStrokeDashArray(lineElem.attributes.get("stroke-dasharray"))
@@ -172,9 +193,9 @@ SvgCircle = {}
 
 SvgCircle.make = function(circleElem)
 	self = new self
-	self.cx = val(circleElem.attributes.cx)
-	self.cy = val(circleElem.attributes.cy)
-	self.r = val(circleElem.attributes.r)
+	self.cx = parseValue(circleElem.attributes.cx)
+	self.cy = parseValue(circleElem.attributes.cy)
+	self.r = parseValue(circleElem.attributes.r)
 
 	self.fillColor = parseColor(circleElem.attributes.get("fill"))
 	self.pathLength = parseValue(circleElem.attributes.get("pathLength"))
@@ -208,6 +229,10 @@ GfxViewBox.make = function
 	return self
 end function
 
+GfxViewBox.getNormalizedDiagonal = function
+	return sqrt(self.width * self.width + self.height * self.height) / sqrt(2)
+end function
+
 SvgViewBox = new GfxViewBox
 
 SvgViewBox.make = function(viewBoxText)
@@ -216,10 +241,10 @@ SvgViewBox.make = function(viewBoxText)
 	pieces = removeEmptyEntries(pieces)
 	qa.assert len(pieces) == 4, "Expected 4 items in the viewBox definition: `{0}`, found `{1}`".fill([ viewBoxText, pieces ])
 
-	self.minX = val(pieces[0])
-	self.minY = val(pieces[1])
-	self.width = val(pieces[2])
-	self.height = val(pieces[3])
+	self.minX = parseValue(pieces[0])
+	self.minY = parseValue(pieces[1])
+	self.width = parseValue(pieces[2])
+	self.height = parseValue(pieces[3])
 	return self
 end function
 
@@ -260,7 +285,9 @@ Svg.make = function(svgElem)
 end function
 
 Svg.getImage = function
-	return self.display.getImage(0, 0, self.viewBox.width, self.viewBox.height)
+	img = self.display.getImage(0, 0, self.viewBox.width, self.viewBox.height)
+	img.flip true
+	return img
 end function
 
 Svg.render = function(pd, x = 0, y = 0, width = -1, height = -1)
