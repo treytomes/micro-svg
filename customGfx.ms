@@ -24,13 +24,15 @@ renderCircle = function(pd, cx, cy, r, clr, strokeWidth=1, strokeDashArray=null,
                 modDistance = distance % patternLength
                 cumulative = 0
                 inDash = false
-                for i in range(0, strokeDashArray.len)
+                i = 0
+                while i < len(strokeDashArray)
                     cumulative += strokeDashArray[i]
                     if modDistance < cumulative then
                         inDash = (i % 2 == 0)  // Even indices = dashes.
                         break
                     end if
-                end for
+                    i += 1
+                end while
             end if
 
             if inDash then
