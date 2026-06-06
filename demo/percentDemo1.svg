@@ -1,0 +1,10 @@
+<svg viewBox="0 0 400 400">
+  <!-- stroke-width: 1% of diagonal (400) = 4 -->
+  <line x1="50" y1="50" x2="350" y2="50" stroke="red" stroke-width="1%" />
+  <!-- r: 10% of min(viewBox.width, viewBox.height) = 40 -->
+  <circle cx="200" cy="200" r="10%" fill="blue" />
+  <!-- stroke-dasharray: 5% of diagonal (400) = 20, 2% = 8 -->
+  <line x1="50" y1="100" x2="350" y2="100" stroke="green" stroke-width="2" stroke-dasharray="5%, 2%" />
+  <!-- rect: 50% width/height = 200x200 -->
+  <rect x="100" y="100" width="50%" height="50%" fill="purple" />
+</svg>

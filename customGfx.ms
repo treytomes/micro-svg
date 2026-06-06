@@ -1,4 +1,6 @@
 renderCircle = function(pd, cx, cy, r, clr, strokeWidth=1, strokeDashArray=null, pathLength=null)
+    if clr == color.clear then return
+
     if strokeDashArray != null and pathLength == null then
         pathLength = 2 * pi * r  // Default to circumference.
 	end if
@@ -47,6 +49,7 @@ renderCircle = function(pd, cx, cy, r, clr, strokeWidth=1, strokeDashArray=null,
 end function
 
 renderFilledCircle = function(pd, cx, cy, r, clr)
+    if clr == color.clear then return
     // Generate points around the circle.
     angleStep = 1 / r  // Smaller step for larger circles.
     angle = 0
